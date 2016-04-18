@@ -75,7 +75,7 @@ listings %>% group_by(room_type) %>%
 Around 53.6% of all listings are for entire home/apts, followed by 43.3% in
 private rooms and 3.1% in shared rooms.
 
-To visualize this with a simple bar chart:
+To visualize this with a bar chart:
 ```{r}
 listings %>% group_by(room_type) %>%
     summarise(n = n()) %>%
@@ -91,7 +91,73 @@ not live in that home, and more of those instances would lead Airbnb further
 away from the spare-room-rentals-for-homeowners-looking-to-make-a-few-extra-
 bucks value proposition.
 
-#### 2. What is the distribution of availability of the listings in a given 365-
+#### 2. Are there hosts actually running businesses off of Airbnb?
+
+I want to examine the distribution of the # of listings each host has on
+Airbnb. I saw that there was a column called `calculated_host_listings_count`,
+but want to verify by computing it myself using the other given columns.
+
+```{r}
+listings %>% group_by(host_id) %>%
+    summarize(my_host_listings_count = n()) %>%
+    arrange(desc(my_host_listings_count)) %>%
+    head()
+
+listings %>% select(host_id, calculated_host_listings_count) %>%
+    distinct() %>%
+    arrange(desc(calculated_host_listings_count)) %>%
+    head()
+```
+
+Whoa, the numbers are pretty different. My guess is that I'm not considering
+some factors `calculated_host_listings_count` considered when it was compiled?
+
+Let's zoom in on host id 30283594 that appeared as 1st in both versions but had
+a different number of listings (56 vs. 41):
+
+```{r, results = "hide"}
+listings %>% filter(host_id == 30283594) %>% View()
+```
+
+Could host_name == NA matter?
+
+```{r, results = "hide"}
+listings %>% filter(host_id == 30283594, !is.na(host_name)) %>% nrow()
+```
+
+That was it! I'm guessing the person who compiled this data set took out all the
+missing values before calculating the host listings count, so listings for which
+`host_name` was n/a didn't get counted. I think they should be counted, since
+the other columns seem to indicate that the entries are valid, so I will be
+using `my_host_listings_count`.
+
+```{r}
+listings <- listings %>% group_by(host_id) %>%
+    mutate(my_host_listings_count = n())
+```
+
+```{r}
+listings %>% group_by(my_host_listings_count) %>%
+    mutate(listings_count_tier = ifelse(my_host_listings_count == 1, "1",
+                                    ifelse(my_host_listings_count == 2, "2",
+                                    ifelse(my_host_listings_count == 3, "3",
+                                           "4 or more")))) %>%
+    ggplot(mapping = aes(x = listings_count_tier)) +
+    geom_bar(stat = "count") +
+    labs(x = "# of Listings Per Host", y = "# of Hosts",
+         title = "Listings Count Per Host")
+```
+
+To answer the question, yes, there seems to be a non-trivial number of hosts
+with three or more listings on Airbnb (with the max number of listings being 56
+as shown above), which goes against the spare-room rental value proposition I
+mentioned earlier. Another way to check whether or not a number of Airbnb
+listings go against the value proposition is to look at the # of days available
+for each listing; if the listing's `room_type` is an entire home and it's
+listed as available for 365 days, we definitely know that the host doesn't live
+in the home.
+
+#### 3. What is the distribution of availability of the listings in a given 365-
 day period?
 
 I'd expect for it to be bimodal, with the maxima near both ends of the
@@ -100,8 +166,8 @@ availability spectrum.
 ```{r}
 listings %>% ggplot(mapping = aes(x = availability_365)) +
     geom_histogram(bins = 30) +
-    labs(x = "", y = "Number of Listings", title = "Histogram of Availability
-         of Airbnb Listings in a Given 365-day Period") +
+    labs(x = "", y = "Number of Listings",
+    title = "Histogram of Availability of Airbnb Listings in a Given 365-day Period") +
     scale_x_continuous(breaks = seq(0, 365, 30)) 
 ```
 
@@ -120,7 +186,7 @@ could day be a specific holiday (e.g. New Year's) when the host would like to
 stay at their place for once?
 
 But perhaps more importantly:
-#### 3. Why are there 6947 listings for `availability_365` = 0? What does it
+#### 4. Why are there 6947 listings for `availability_365` = 0? What does it
 mean for rooms to be available for 0 days?
 
 ```{r, results = 'hide'}
@@ -159,7 +225,7 @@ is 0); if the house is totally booked, regardless of how many days it was
 initially listed as available, `availability_365` is 0. I wrongly assumed that
 'not available' meant blocked out by the host.
 
-#### 4. Are there more listings in popular tourist destinations?
+#### 5. Are there more listings in popular tourist destinations?
 
 I think there would be the most number of listings in residential areas near
 popular tourist destinations.
@@ -172,20 +238,51 @@ leaflet(listings) %>%
 
 Zooming in on the cluster with the biggest count at each level, we are
 ultimately taken to the blocks around Tompkins Square Park, which seems to be
-a primarily residential area.
+a primarily residential area. I wish I knew more about New York City; all I
+know about the boroughs is that the majority of the most well-known attractions
+are located in Manhattan. Maybe I can use `minimum_nights` to get a rough idea
+of which boroughs tend to be more residential (since the bigger the
+`minimum_nights` value, the more likely that the host is using Airbnb to rent
+out his/her place)?
 
+#### 6. What is the distribution of minimum nights for each borough?
 
+```{r}
+listings$minimum_nights %>% summary()
+```
 
+I'd expect for the distribution to be heavily skewed to near 0. I'd also expect
+for the median values for minimum nights to be higher in less touristy (/more
+residential) areas such as Queens since more people would be using it for 
+longer-term rentals. Too many outliers (especially an insane max value like
+1250) would flatten out the boxplot, so I'm going to filter out listings for
+which `minimum_nights` > 15 to zoom in on the boxes themselves.
 
+```{r}
+listings %>% filter(minimum_nights < 15) %>%
+    ggplot(mapping = aes(x = factor(neighbourhood_group),
+                                  y = minimum_nights)) +
+    geom_boxplot() +
+    scale_y_continuous(breaks = seq(1, 20, 1)) +
+    labs(x = "Borough", y = "Minumum Nights",
+        title = "Distribution of Minimum Nights Per Borough")
+```
 
+It turns out I was wrong; Bronx, Queens, and Staten Island actually have the
+lowest median values (1) for `minimum_nights`, as opposed to Brooklyn and
+Manattan's median of 2 nights. As spineless as I may sound, I can actually
+think of a number of explanations for this, what I think is the strongest
+explanation being that people wouldn't resort to Airbnb to find longer-term
+housing in Queens where the platform takes a portion of the rent each night;
+people don't mind paying the extra fee when quality short-term housing
+(especially as alternative to hotels) is extremely hard to find, as is the case
+for Brooklyn and Manhattan. Which brings me to price.
 
+#### 7. What is the distribution of price for each borough?
 
-
-I should redefine the initial question.
-
-Are most Airbnb listings in NYC instances of "home-sharing" (spare-room rentals)
-or "illegal hotels" as its critics claim? In other words, what percentage of
-listings are homes whose hosts don't live there?
+I filtered out the prices > $750 a night to make the boxes more prominent, but
+the number of outliers especially for Brooklyn and Manhattan is pretty telling
+about prices in those two boroughs.
 
 ```{r}
 listings %>% filter(price < 750) %>%
@@ -193,52 +290,10 @@ listings %>% filter(price < 750) %>%
     ggplot(mapping = aes(x = room_type, y = price, fill = room_type)) +
     geom_boxplot() +
     facet_grid(~ neighbourhood_group) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_y_continuous(breaks = seq(0, 750, 50)) +
+    labs(x = "Room Type", y = "Price Per Night",
+        title = "Price Per Night of Airbnb Listings in NYC") +
+    theme(legend.position = "none")
 ```
 
-The residential threshold of 28 is arbitrary, and changing it to 14 yields 756
-more listings; I set it to 28 days because that's four weeks, which can be
-compared to monthly rent.
-
-### Iffy
-```{r}
-listings %>% mutate(residential = (minimum_nights >= 28)) %>%
-    count(residential)
-```
-
-
-Minimum nights
-```{r}
-listings %>% select(minimum_nights) %>%
-    summary()
-
-listings %>% filter(minimum_nights > 300) %>%
-    arrange(desc(minimum_nights))
-```
-
-
-## Appendix
-
-### Validating the dataset
-```{r}
-listings %>% group_by(host_id) %>%
-    summarize(my_host_listings_count = n()) %>%
-    arrange(desc(my_host_listings_count)) %>%
-    head()
-
-listings %>% select(host_id, calculated_host_listings_count) %>%
-    distinct() %>%
-    arrange(desc(calculated_host_listings_count)) %>%
-    head()
-```
-
-Whoa, the numbers are pretty different.
-
-"How many houses and apartments are being rented out frequently to tourists and not to long-term residents?"
-"How much are hosts making from renting to tourists (compare that to long-term rentals)?"
-"Which hosts are running a business with multiple listings and where they?"
-
-Tourist destinations
-
-Facet by neighborhood group
-Listings per host
