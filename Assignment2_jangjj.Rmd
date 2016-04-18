@@ -47,6 +47,12 @@ reviews %>% head()
 neighborhoods %>% head()
 ```
 
+I see that neighborhood information has already been joined to provide
+neighborhood group information in listings, so I don't need to consider
+neighborhoods anymore. I also don't think I will be using reviews metadata (at
+least for now), so that leaves me with one (rich) data frame to work with:
+listings.
+
 Some columns that will come in handy in answering my initial question are 
 `room_type` and `availability_365`. I realized that there's no actual booking
 information (e.g. how popular a certain listing is), which isn't completely 
@@ -59,12 +65,11 @@ actual bookings to be 4), and I'll use that.
 listings <- listings %>% mutate(estimated_bookings = 2*number_of_reviews)
 ```
 
-First I'd like to see around what percentage of all listings are entire home/
-apts.
+#### 1. Around what percentage of all listings are entire home/apts?
 
 ```{r}
 listings %>% group_by(room_type) %>%
-    summarise(percentage = n()/nrow(listings))
+    summarise(percentage = n()/nrow(listings), n =n())
 ```
 
 Around 53.6% of all listings are for entire home/apts, followed by 43.3% in
@@ -73,9 +78,11 @@ private rooms and 3.1% in shared rooms.
 To visualize this with a simple bar chart:
 ```{r}
 listings %>% group_by(room_type) %>%
-    mutate(n = n()) %>%
+    summarise(n = n()) %>%
     ggplot(mapping = aes(x = room_type, y = n, fill = room_type)) +
-    geom_bar(stat = "identity")
+    geom_bar(stat = "identity") +
+    labs(x = "", y = "Number of Listings", title = "Room Types of Airbnb Listings in NYC") +
+    theme(legend.position = "none")
 ```
 
 I should take into account the availability of the listings as well; if, say,
@@ -84,12 +91,18 @@ not live in that home, and more of those instances would lead Airbnb further
 away from the spare-room-rentals-for-homeowners-looking-to-make-a-few-extra-
 bucks value proposition.
 
-First I look at the distribution of availability. I'd expect for it to be
-bimodal, with the maxima near both ends of the availability spectrum.
+#### 2. What is the distribution of availability of the listings in a given 365-
+day period?
+
+I'd expect for it to be bimodal, with the maxima near both ends of the
+availability spectrum.
 
 ```{r}
 listings %>% ggplot(mapping = aes(x = availability_365)) +
-    geom_histogram(bins = 30)
+    geom_histogram(bins = 30) +
+    labs(x = "", y = "Number of Listings", title = "Histogram of Availability
+         of Airbnb Listings in a Given 365-day Period") +
+    scale_x_continuous(breaks = seq(0, 365, 30)) 
 ```
 
 Turns out it's true. I'd like to look at the two spikes within the histogram:
@@ -106,11 +119,11 @@ listings for 363 days and 700 listings for 364 days). Now I'm curious what the
 could day be a specific holiday (e.g. New Year's) when the host would like to
 stay at their place for once?
 
-But perhaps more importantly, why are there 6947 listings for
-`availability_365` = 0? What does it mean for rooms to be available for 0 days?
+But perhaps more importantly:
+#### 3. Why are there 6947 listings for `availability_365` = 0? What does it
+mean for rooms to be available for 0 days?
 
-
-```{r}
+```{r, results = 'hide'}
 listings %>% filter(availability_365 == 0) %>% head()
 ```
 
@@ -120,9 +133,11 @@ probably because it's implicitly arranged by neighbourhood. Could
 `availability_365` have to do with neighbourhood/neighbourhood_group?
 
 ```{r}
-listings %>% mutate(zero_availability = (availability_365 == 0)) %>%
+listings %>% mutate(`0 Days Available` = (availability_365 == 0)) %>%
     group_by(neighbourhood_group) %>%
-    summarize(percentage = sum(zero_availability)/n(), total = n())
+    ggplot(mapping = aes(x = neighbourhood_group, fill = `0 Days Available`)) +
+    geom_bar(stat = "count") +
+    labs(x = "Borough", y = "Number of Listings per Borough", title = "Zero vs. Non-zero Days of Availability for Listings")
 ```
 
 Around 20% of listings in Brooklyn and Manhattan have availability 0, as do 13%
@@ -140,19 +155,24 @@ rather than being "blacked out" by a host."
 This is significant. Theoretically, a house could be available for 365 days but
 if it's totally booked for 363 of those days, `availability_365` would be 2.
 This would explain the 6947 listings figure (for which the availability variable
-is 0); if the house is totally booked, regardless of how many days it wasn't
-blocked out by the host, `availability_365` is 0. I wrongly assumed that 'not
-available' meant blocked out by the host.
+is 0); if the house is totally booked, regardless of how many days it was
+initially listed as available, `availability_365` is 0. I wrongly assumed that
+'not available' meant blocked out by the host.
 
-## Question: Are there more listings in popular tourist destinations?
+#### 4. Are there more listings in popular tourist destinations?
+
+I think there would be the most number of listings in residential areas near
+popular tourist destinations.
 
 ```{r}
 leaflet(listings) %>%
-  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addTiles() %>%
   addMarkers(clusterOptions = markerClusterOptions())
 ```
 
-
+Zooming in on the cluster with the biggest count at each level, we are
+ultimately taken to the blocks around Tompkins Square Park, which seems to be
+a primarily residential area.
 
 
 
