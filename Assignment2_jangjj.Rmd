@@ -26,12 +26,13 @@ sounded too exciting to resist.
 ## Initial question
 Are most Airbnb listings in NYC instances of "home-sharing" (spare-room rentals)
 or "illegal hotels" as its critics claim? In other words, what percentage of
-listings are homes whose hosts don't live there?
+listings are homes that are rented out in its entirety?
 
 ```{r}
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(leaflet)
 
 listings <- read_csv("~/Desktop/taking/CS448B/Airbnb/listings.csv")
 reviews <- read_csv("~/Desktop/taking/CS448B/Airbnb/reviews.csv")
@@ -113,8 +114,10 @@ But perhaps more importantly, why are there 6947 listings for
 listings %>% filter(availability_365 == 0) %>% head()
 ```
 
-At first glance, they don't seem to have anything in common; could it have to
-do with neighbourhood/neighbourhood_group?
+At first glance, just looking at the head, I notice that the rows don't seem to
+have anything particular in common other than neighbourhood, but this is
+probably because it's implicitly arranged by neighbourhood. Could
+`availability_365` have to do with neighbourhood/neighbourhood_group?
 
 ```{r}
 listings %>% mutate(zero_availability = (availability_365 == 0)) %>%
@@ -141,6 +144,23 @@ is 0); if the house is totally booked, regardless of how many days it wasn't
 blocked out by the host, `availability_365` is 0. I wrongly assumed that 'not
 available' meant blocked out by the host.
 
+## Question: Are there more listings in popular tourist destinations?
+
+```{r}
+leaflet(listings) %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(clusterOptions = markerClusterOptions())
+```
+
+
+
+
+
+
+
+
+
+
 I should redefine the initial question.
 
 Are most Airbnb listings in NYC instances of "home-sharing" (spare-room rentals)
@@ -160,6 +180,7 @@ The residential threshold of 28 is arbitrary, and changing it to 14 yields 756
 more listings; I set it to 28 days because that's four weeks, which can be
 compared to monthly rent.
 
+### Iffy
 ```{r}
 listings %>% mutate(residential = (minimum_nights >= 28)) %>%
     count(residential)
@@ -175,6 +196,8 @@ listings %>% filter(minimum_nights > 300) %>%
     arrange(desc(minimum_nights))
 ```
 
+
+## Appendix
 
 ### Validating the dataset
 ```{r}
