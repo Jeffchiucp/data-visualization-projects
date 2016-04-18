@@ -1,0 +1,201 @@
+---
+title: "CS 448B Assignment 2"
+author: "Joanne Jang"
+date: "April 17, 2016"
+output: html_document
+---
+
+## Why I chose this dataset
+Among all the presents (and love) I received on my 21st birthday earlier this
+month, my favorite was the Inside Airbnb dataset Christine (who's also taking
+this class) gave me. I love Airbnb-- its mission and the company culture-- but
+I'm not well-informed re: the controversy surrounding their practices, so I
+thought that exploring this dataset would be a great way to learn more about
+the controversy while sifting through (daydreaming about?) listings in NYC.
+
+## About the dataset
+The subset of the huge dataset I chose consists of review metadata, listings,
+and neighborhood data in New York City, NY (35957 listings) compiled on 2/2/2016.
+As I hinted earlier, the website hosting the dataset-- insideairbnb.com-- is
+biased; it dubs Airbnb as "illegal hotels," and I was first hesitant to use this
+for my project fearing that the compilation of the data itself might have been
+biased. Upon reading the disclaimers and articles written about it, however, I
+decided to proceed because the compilation itself seemed harmless and it
+sounded too exciting to resist.
+
+## Initial question
+Are most Airbnb listings in NYC instances of "home-sharing" (spare-room rentals)
+or "illegal hotels" as its critics claim? In other words, what percentage of
+listings are homes whose hosts don't live there?
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+listings <- read_csv("~/Desktop/taking/CS448B/Airbnb/listings.csv")
+reviews <- read_csv("~/Desktop/taking/CS448B/Airbnb/reviews.csv")
+neighborhoods <- read_csv("~/Desktop/taking/CS448B/Airbnb/neighbourhoods.csv")
+```
+
+## Pre-exploration
+```{r}
+summary(listings)
+listings %>% head()
+reviews %>% head()
+neighborhoods %>% head()
+```
+
+Some columns that will come in handy in answering my initial question are 
+`room_type` and `availability_365`. I realized that there's no actual booking
+information (e.g. how popular a certain listing is), which isn't completely 
+necessary in answering my question, but would be good to have as additional
+data. The readme page suggests a review rate of 50% to convert reviews to
+estimated bookings (e.g. if there are 2 reviews, we can estimate the # of
+actual bookings to be 4), and I'll use that.
+
+```{r}
+listings <- listings %>% mutate(estimated_bookings = 2*number_of_reviews)
+```
+
+First I'd like to see around what percentage of all listings are entire home/
+apts.
+
+```{r}
+listings %>% group_by(room_type) %>%
+    summarise(percentage = n()/nrow(listings))
+```
+
+Around 53.6% of all listings are for entire home/apts, followed by 43.3% in
+private rooms and 3.1% in shared rooms.
+
+To visualize this with a simple bar chart:
+```{r}
+listings %>% group_by(room_type) %>%
+    mutate(n = n()) %>%
+    ggplot(mapping = aes(x = room_type, y = n, fill = room_type)) +
+    geom_bar(stat = "identity")
+```
+
+I should take into account the availability of the listings as well; if, say,
+an entire home is listed as available for 365 days, we know that the host does
+not live in that home, and more of those instances would lead Airbnb further
+away from the spare-room-rentals-for-homeowners-looking-to-make-a-few-extra-
+bucks value proposition.
+
+First I look at the distribution of availability. I'd expect for it to be
+bimodal, with the maxima near both ends of the availability spectrum.
+
+```{r}
+listings %>% ggplot(mapping = aes(x = availability_365)) +
+    geom_histogram(bins = 30)
+```
+
+Turns out it's true. I'd like to look at the two spikes within the histogram:
+
+```{r}
+listings %>% filter(availability_365 < 10 | availability_365 > 355) %>%
+    group_by(availability_365) %>%
+    summarise(n = n())
+```
+
+There are 6209 listings that are available 365 days a year (followed by 611
+listings for 363 days and 700 listings for 364 days). Now I'm curious what the
+1 or 2 off-days are for the houses listed as available for 363 and 364 days;
+could day be a specific holiday (e.g. New Year's) when the host would like to
+stay at their place for once?
+
+But perhaps more importantly, why are there 6947 listings for
+`availability_365` = 0? What does it mean for rooms to be available for 0 days?
+
+
+```{r}
+listings %>% filter(availability_365 == 0) %>% head()
+```
+
+At first glance, they don't seem to have anything in common; could it have to
+do with neighbourhood/neighbourhood_group?
+
+```{r}
+listings %>% mutate(zero_availability = (availability_365 == 0)) %>%
+    group_by(neighbourhood_group) %>%
+    summarize(percentage = sum(zero_availability)/n(), total = n())
+```
+
+Around 20% of listings in Brooklyn and Manhattan have availability 0, as do 13%
+of listings in Queens and 6-7% of listings in Bronx and Staten Island. Seeing
+the total numbers, though, I realize I should differentiate between popular
+tourist destinations and mostly residential regions. Anyway this doesn't tell
+us much about the 0 available days.
+
+Going back to the documentation, I found this tidbit: "The Airbnb calendar for a
+listing does not differentiate between a booked night vs an unavailable night,
+therefore these bookings have been counted as "unavailable". This serves to
+understate the Availability metric because popular listings will be "booked"
+rather than being "blacked out" by a host."
+
+This is significant. Theoretically, a house could be available for 365 days but
+if it's totally booked for 363 of those days, `availability_365` would be 2.
+This would explain the 6947 listings figure (for which the availability variable
+is 0); if the house is totally booked, regardless of how many days it wasn't
+blocked out by the host, `availability_365` is 0. I wrongly assumed that 'not
+available' meant blocked out by the host.
+
+I should redefine the initial question.
+
+Are most Airbnb listings in NYC instances of "home-sharing" (spare-room rentals)
+or "illegal hotels" as its critics claim? In other words, what percentage of
+listings are homes whose hosts don't live there?
+
+```{r}
+listings %>% filter(price < 750) %>%
+    group_by(neighbourhood_group) %>%
+    ggplot(mapping = aes(x = room_type, y = price, fill = room_type)) +
+    geom_boxplot() +
+    facet_grid(~ neighbourhood_group) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The residential threshold of 28 is arbitrary, and changing it to 14 yields 756
+more listings; I set it to 28 days because that's four weeks, which can be
+compared to monthly rent.
+
+```{r}
+listings %>% mutate(residential = (minimum_nights >= 28)) %>%
+    count(residential)
+```
+
+
+Minimum nights
+```{r}
+listings %>% select(minimum_nights) %>%
+    summary()
+
+listings %>% filter(minimum_nights > 300) %>%
+    arrange(desc(minimum_nights))
+```
+
+
+### Validating the dataset
+```{r}
+listings %>% group_by(host_id) %>%
+    summarize(my_host_listings_count = n()) %>%
+    arrange(desc(my_host_listings_count)) %>%
+    head()
+
+listings %>% select(host_id, calculated_host_listings_count) %>%
+    distinct() %>%
+    arrange(desc(calculated_host_listings_count)) %>%
+    head()
+```
+
+Whoa, the numbers are pretty different.
+
+"How many houses and apartments are being rented out frequently to tourists and not to long-term residents?"
+"How much are hosts making from renting to tourists (compare that to long-term rentals)?"
+"Which hosts are running a business with multiple listings and where they?"
+
+Tourist destinations
+
+Facet by neighborhood group
+Listings per host
