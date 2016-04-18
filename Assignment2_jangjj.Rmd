@@ -116,10 +116,11 @@ Let's zoom in on host id 30283594 that appeared as 1st in both versions but had
 a different number of listings (56 vs. 41):
 
 ```{r, results = "hide"}
-listings %>% filter(host_id == 30283594) %>% View()
+listings %>% filter(host_id == 30283594)
 ```
 
-Could host_name == NA matter?
+Piping the above command to View(), I see that some `host_name` entries are
+n/a even though they have the same `host_id`. Could host_name == NA matter?
 
 ```{r, results = "hide"}
 listings %>% filter(host_id == 30283594, !is.na(host_name)) %>% nrow()
@@ -186,6 +187,7 @@ could day be a specific holiday (e.g. New Year's) when the host would like to
 stay at their place for once?
 
 But perhaps more importantly:
+
 #### 4. Why are there 6947 listings for `availability_365` = 0? What does it
 mean for rooms to be available for 0 days?
 
@@ -292,8 +294,19 @@ listings %>% filter(price < 750) %>%
     facet_grid(~ neighbourhood_group) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     scale_y_continuous(breaks = seq(0, 750, 50)) +
-    labs(x = "Room Type", y = "Price Per Night",
+    labs(x = "Room Type", y = "Price Per Night ($)",
         title = "Price Per Night of Airbnb Listings in NYC") +
     theme(legend.position = "none")
+```
+
+#### 8. Roughly how much have hosts made by using Airbnb?
+
+```{r}
+listings %>% group_by(host_id) %>%
+    mutate(estimated_earning = estimated_bookings*price*minimum_nights) %>%
+    filter(estimated_earning < 10000) %>%
+    ggplot(mapping = aes(x = factor(neighbourhood_group), y = estimated_earning)) +
+    geom_boxplot() +
+    scale_y_continuous(minor_breaks = NULL, breaks = seq(0, 10000, 1000))
 ```
 
