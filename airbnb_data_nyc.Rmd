@@ -37,9 +37,9 @@ library(dplyr)
 library(ggplot2)
 library(leaflet)
 
-listings <- read_csv("~/Desktop/taking/CS448B/Airbnb/listings.csv")
-reviews <- read_csv("~/Desktop/taking/CS448B/Airbnb/reviews.csv")
-neighborhoods <- read_csv("~/Desktop/taking/CS448B/Airbnb/neighbourhoods.csv")
+listings <- read_csv("~/Desktop/taking/CS448B/all_assignments/airbnb_nyc_listings.csv")
+reviews <- read_csv("~/Desktop/taking/CS448B/all_assignments/airbnb_nyc_reviews.csv")
+neighborhoods <- read_csv("~/Desktop/taking/CS448B/all_assignments/airbnb_nyc_neighbourhoods.csv")
 ```
 
 ## Pre-exploration
