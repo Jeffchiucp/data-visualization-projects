@@ -1,0 +1,90 @@
+---
+title: "CS 448B Assignment 1"
+author: "Joanne Jang"
+date: "April 21, 2016"
+output: html_document
+---
+
+```{r, message = FALSE, echo = FALSE}
+setwd("~/Desktop/taking/CS448B/Assignment1")
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(stringr)
+library(gridExtra)
+library(tidyr)
+library(RColorBrewer)
+df <- read_csv("police_killings.csv")
+df <- df %>% filter(!is.na(nat_bucket))
+```
+
+```{r, echo = FALSE}
+census <- list(raceethnicity = c("White", "Black", "Asian/Pacific Islander", "Hispanic/Latino"), "1" = c(18207, 5569, 916, 3903), "2" = c(19639, 4113, 952, 4055), "3" = c(20332, 3365, 1066, 3583), "4" = c(20954, 2447, 1378, 2930), "5" = c(21131, 1704, 2020, 1768))
+census <- as_data_frame(census)
+gathered <- census %>% gather(nat_bucket, count, 2:6)
+```
+
+```{r, fig.width = 10, fig.height = 10}
+census_bars <- gathered %>% group_by(nat_bucket) %>%
+    mutate(total_bucket = sum(count)) %>%
+    ungroup() %>%
+    ggplot(mapping = aes(x = as.numeric(nat_bucket), y = count/total_bucket)) +
+    geom_bar(stat = "identity", aes(fill = as.numeric(nat_bucket))) +
+    facet_grid(~ raceethnicity) +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          plot.title = element_text(size = 11, face = "bold")) +
+    scale_y_continuous(limit = c(0, 0.8),breaks = seq(0.0, 0.8, 0.1)) +
+    scale_fill_gradient2(high = "black") +
+    ggtitle("Census Data")
+
+crime_bars <- df %>% group_by(nat_bucket) %>%
+    mutate(nrows_bucket = n()) %>%
+    ungroup() %>%
+    group_by(nat_bucket, raceethnicity) %>%
+    mutate(percent_responsible_within_bucket = n()/nrows_bucket) %>%
+    ungroup() %>%
+    distinct(nat_bucket, raceethnicity) %>%
+    arrange(nat_bucket, desc(percent_responsible_within_bucket)) %>%
+    filter(raceethnicity %in%
+               c("White", "Black", "Hispanic/Latino", "Asian/Pacific Islander")) %>%
+    ggplot(mapping = aes(x = nat_bucket, y = percent_responsible_within_bucket)) +
+    geom_bar(stat = "identity", aes(fill = nat_bucket)) +
+    facet_grid(~ raceethnicity) +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          plot.title = element_text(size = 11, face = "bold")) +
+    scale_y_continuous(limit = c(0, 0.8), breaks = seq(0.0, 0.8, 0.1)) +
+    scale_fill_gradient(low = "skyblue", high = "darkblue") +
+    ggtitle("Police Killings Data")
+
+grid.arrange(census_bars, crime_bars, top = "Distribution of Race/Ethnicity Within Income Quintile", bottom = "Income Quintile (Lowest Fifth to Highest Fifth)", left = "% Within N-th Income Quintile")
+```
+
+
+### Story:
+
+In my exploration of the police killings data set, I was mainly interested in finding potential discrepancies between the given data and the census data (U.S. population as a whole) as well as interesting trends within each data set, especially in the context of race/ethnicity and income. I found two that I wanted to highlight through my visualization: 1) the racial income inequality in the census data set and 2) the fact that the police killings data set doesn’t follow the aforementioned income inequality trend lines. While the Black population made up for approximately 20% of the lowest income quintile in the census data set, it made up for more than 40% of the lowest income quintile in the police killings data set, supporting Ben Casselman’s statement in the FiveThirtyEight article that “Black Americans were especially likely to be killed in poorer neighborhoods.”
+
+
+### Design Decisions:
+
+##### Obscured
+I believe that the most crucial aspect of the data set that is obscured in my design is the “armed” variable, since it’s not indirectly accounted for by race/ethnicity nor income like the other variables (e.g. unemployment rate), and 365 out of 467 (78%) killed by the police were armed which indicates that it might be a strong predictor of police killings. After experimenting with facets and fill colors with an “armed vs. unarmed” indicator variable I decided to leave it out as it hindered an effective communication of the messages I chose. I also decided not to include Native American and Unknown populations in my visualization. The facet for Native American population featured virtually non-existent bars because the original data set had only 4 data points, and I felt that it cluttered the visualization. I left out the Unknown population primarily because “Unknown” wasn’t a category in the census data (cited below), so including it would make the visualization slightly less intuitive.
+
+##### Bar chart
+I transformed the raw numbers in the data into percentages because I wanted to highlight the discrepancies across race/ethnicity, and plotting the raw numbers would unintentionally “weight” the police killings of white people (50.5% of the police killings were white). While I initially considered a pie chart which is traditionally an appropriate choice for percentages, I wanted to direct attention to the linear trends which highlight the income disparities in the census data (e.g. downward trend for Black populations, upward trend for Asian and White populations) as well as the patterns in the police killings data set that don’t correspond to the linear trends. To further emphasize and aid the comparison of the trends (or lack thereof) across races for both data sets, I chose the two-by-four layout.
+
+### Aesthetics
+
+To facilitate comparison between the census and police killings data sets I used the same y scale with the same major breaks (using a different y scale with different limits would have visually distorted the data), and bolded the inner labels identifying the data sets. Finally, I used blue as the theme color for police killings data, grayscale for the census data, and gradients for both data sets to make the visualization color-blind-friendly. The gradients made sense because the buckets/quintiles are ordered factors (and behind the buckets are income data points, which are continuous) and a gradient is an ordering of color. This use of gradients and the x-axis labels also allowed me to remove the legend for the coloring which had cluttered the visualization.
+
+### Tools
+
+Hadleyverse packages in R; specifically, dplyr and tidyr to transform and mold the data, and ggplot2 and gridExtra to create the visualization.
+
+### Other Sources
+
+U.S. Census Bureau, Current Population Survey, 2015 Annual Social and Economic Supplement. “Table HINC-05. Percent Distribution of Households, by Selected Characteristics Within Income Quintile and Top 5 Percent in 2014.” <https://www.census.gov/hhes/www/cpstables/032015/hhinc/toc.htm>

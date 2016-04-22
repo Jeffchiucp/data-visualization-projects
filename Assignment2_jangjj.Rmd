@@ -1,5 +1,5 @@
 ---
-title: "CS 448B Assignment 2"
+title: "CS 448B Assignment 2: Inside Airbnb"
 author: "Joanne Jang"
 date: "April 17, 2016"
 output:
@@ -9,11 +9,12 @@ output:
 
 ## Why I chose this dataset
 Among all the presents (and love) I received on my 21st birthday earlier this
-month, my favorite was the Inside Airbnb dataset Christine (who's also taking
-this class) gave me. I love Airbnb-- its mission and the company culture-- but
-I'm not well-informed re: the controversy surrounding their practices, so I
-thought that exploring this dataset would be a great way to learn more about
-the controversy while sifting through (daydreaming about?) listings in NYC.
+month, my favorite was the [Inside Airbnb](http://insideairbnb.com) dataset
+Christine (who's also taking this class) gave me. I love Airbnb-- its mission
+and the company culture-- but I'm not well-informed re: the controversy
+surrounding their practices, so I thought that exploring this dataset would be a
+great way to learn more about the controversy while sifting through (daydreaming
+about?) listings in NYC.
 
 ## About the dataset
 The subset of the huge dataset I chose consists of review metadata, listings,
