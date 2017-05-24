@@ -4,8 +4,11 @@ author: "Joanne Jang"
 date: "5/23/2017"
 output: html_document
 ---
+## About the dataset
+426 observations of 115 variables.
 data from: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109490#pone.0109490-Zunhammer1
 
+## Data cleaning
 ```{r, message = FALSE}
 # Libraries
 library(readr)
@@ -13,68 +16,76 @@ library(dplyr)
 library(ggplot2)
 
 # Dataset
-df <- read_delim("/Users/jjang/sleep_eda/Exam_Stress_Zunhammer_et_al_2013.csv", delim=";", col_types = cols(PSQI_ITEM1_Bedtime = col_character(), PSQI_ITEM3_Waketime = col_character(), PSQI_Time_in_Bed = col_number()))
+df <- read_delim("./Exam_Stress_Zunhammer_et_al_2013.csv", delim=";", col_types = cols(PSQI_ITEM1_Bedtime = col_character(), PSQI_ITEM3_Waketime = col_character(), PSQI_Time_in_Bed = col_number()))
 
-# filtering dropouts
+# cleaning
 df <- df %>% filter(filter_dropouts == 1)
-summary(df$time)
 df$time <- ordered(df$time, level = c(1, 2, 3), labels=c("pre-exam", "during", "post-exam"))
 df$PSQI_SUB_Sleep_Efficiency <- ordered(df$PSQI_SUB_Sleep_Efficiency, levels=c(0, 1, 2, 3), labels=c("> 85%", "75-84%", "65-74%", "< 65%"))
 df$sex <- factor(df$sex, levels=c(0,1), labels=c("female", "male"))
-
 ```
-#### Perceived stress
-```{r}
 
+## Initial question
+Do exams actually increase the perceived stress level? If so, how does the
+stress affect various aspects of sleep (e.g. sleep quality, sleep efficiency,
+sleep latency)?
+
+### Perceived stress and exam period
+[**Perceived Stress Scale (PSS)**](http://www.mindgarden.com/documents/PerceivedStressScale.pdf) measures the degree to which an individual finds a situation stressful.
+
+My hypothesis is that PSS will increase from pre-exam period to exam period, and then dip down in the post-exam period. We can get a sense of the trend using a boxplot:
+
+```{r, warning=FALSE}
 df %>% ggplot(aes(x=factor(time), y=PSQ_total)) +
     geom_boxplot() +
     ggtitle("Perceived Stress") +
-    labs(x = "exam season", y = "perceived stress score (PSQ-20)")
+    labs(x = "exam period", y = "perceived stress score (PSQ-20)")
 ```
 
-#### Perceived sleep quality index
-```{r}
+It looks like the hypothesis was correct in that there's an increase in PSS during exam period, but there isn't a huge difference between PSS scores in pre- and post-exam period, although the range does decrease.
 
-df %>% ggplot(aes(x=factor(time), y=PSQI_total)) +
-    geom_boxplot() +
-    geom_hline(yintercept=5, color="red") +
-    ggtitle("Perceived Sleep Quality Index") +
-    labs(x = "exam season", y = "PSQI score")
+##### Does the number of exams have a more granular effect on PSS level?
+
+The obvious guess would be that the more exams a student has to take, the more stressed they might be. To verify this we can plot the number of exams a student has to take against his/her PSS, and facet it by exam period. 
+
+```{r, warning = FALSE}
+df %>% ggplot(aes(x=number_of_exams_in_term, y=PSQ_total)) +
+    geom_point() +
+    geom_smooth() +
+    facet_grid(~time) +
+    ggtitle("# of Exams and Perceived Stress") +
+    labs(x = "# exams in term", y = "perceived stress score (PSQ-20)")
 ```
 
+Interestingly enough, it looks like there isn't an obvious correlation between PSS and the number of exams a student has to take.
 
-#### Sleep time and efficiency comparison
-```{r}
-df %>% ggplot(aes(x=factor(time), y=PSQI_ITEM4_Sleep_Time)) +
-    geom_boxplot() +
-    ggtitle("Sleep Time Distribution") +
-    labs(x = "exam season", y = "sleep time (h)") +
-    scale_y_continuous(breaks=seq(2,12,0.5))
+#### Perceived Stress and Sleep
+The [**Regensburg Insomnia Scale (RIS)**](https://hqlo.biomedcentral.com/articles/10.1186/1477-7525-11-65) is a self-rating scale meant to assess the features of insomnia. The textbook definition of insomnia is "trouble either falling asleep or staying asleep to the point that a person perceives it bothers them the next day" (Dement's Sleep and Dreams) Insomnia can be temporary or persistent, and one of the common precipitating circumstances of insomnia is stress.
 
-summary(df$course_of_study)
+Applying this knowledge we can hypothesize that PSS and RIS are directly correlated, and we can plot them against each other to find this out. I'm also curious as to whether there is a difference in this correlation between males and females.
+
+```{r, warning = FALSE}
+df %>% ggplot(aes(x=PSQ_total, y=RIS, color = sex)) +
+    geom_point() +
+    geom_smooth() +
+    facet_grid(~time) +
+    ggtitle("Perceived Stress and Insomnia") +
+    labs(x = "perceived stress score (PSQ-20)", y = "Regensburg Insomnia Scale")
 ```
 
-Sleep efficiency:
+This figure clearly indicates that perceived stress and insomnia are directly correlated. Determining whether sex is significant seems to need further statistical analysis, but we can see that the effect of stress on insomnia in the post-exam period is lower relative to the pre-exam period.
 
-# hours slept / # hours spent in bed * 100
+#### Does perceived stress have an effect on sleep quality as well?
+[National Sleep Foundation](https://sleepfoundation.org/press-release/what-good-quality-sleep) defines good sleep quality as the following:
+* high **sleep efficiency**: the time spent actually sleeping while in bed must be at least 85% of the total time spent in bed, calculated as (# hours slept / # hours spent in bed * 100)%
+* low **sleep latency**: falling asleep in 30 minutes or less
+* minimal arousal: waking up no more than once per night
 
->85%: 0
-75-84%: 1
-65-74%: 2
-< 65: 3
+The dataset we're exploring uses PSQI, the [Pittsburgh Sleep Quality Index](http://www.sciencedirect.com/science/article/pii/0165178189900474) to measure sleep quality. The PSQI score is inversely correlated with good sleep quality, which means that the higher the PSQI score, the worse the sleep quality. It is said that "poor sleep" is a PSQI score >= 5. 
 
-The lower the score, the more efficient.
+We can plot PSS against PSQI to get a grasp on the relationship between perceived stress and sleep quality.
 
-```{r}
-df %>% subset(!is.na(PSQI_SUB_Sleep_Efficiency)) %>%
-    ggplot(aes(x=PSQI_SUB_Sleep_Efficiency)) +
-    geom_bar(stat="count", aes(fill=factor(PSQI_SUB_Sleep_Efficiency))) +
-    ggtitle("Sleep Efficiency Distribution") +
-    facet_grid(. ~ time) +
-    labs(x = "sleep efficiency", y = "count") +
-    theme(legend.position="none")
-```
-```{r}
+```{r, warning=FALSE}
 df %>%
     ggplot(aes(x=PSQ_total, y=PSQI_total, color = time)) +
     geom_point() +
@@ -85,6 +96,62 @@ df %>%
     facet_grid(~time)
 ```
 
+Here's another take:
+
+```{r, warning = FALSE}
+df %>% ggplot(aes(x=PSQ_total, y=PSQI_total, color = sex)) +
+    geom_point() +
+    geom_smooth() +
+    facet_grid(~time) +
+    ggtitle("Perceived Stress and Sleep Quality") +
+    labs(x = "perceived stress score (PSQ-20)", y = "PSQ score")
+```
+
+It looks like the perceived stress score is a very strong predictor of sleep quality, which makes sense, but is still cool to see the finding derived from data.
+
+Taking perceived stress out of the equation, we plot the distribution of PSQI across pre-, during, and post-exam periods.
+
+```{r, warning=FALSE}
+
+df %>% ggplot(aes(x=factor(time), y=PSQI_total)) +
+    geom_boxplot() +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Perceived Sleep Quality Index") +
+    labs(x = "exam season", y = "PSQI score")
+```
+
+The median PSQI score during exam season sits comfortably above the "poor sleep" boundary, and, while the median scores in other seasons lie below it.
+
+#### Sleep time and efficiency comparison
+
+We further investigate the effect of exam periods on sleep efficiency and the total length of sleep.
+
+```{r, warning = FALSE}
+df %>% ggplot(aes(x=factor(time), y=PSQI_ITEM4_Sleep_Time)) +
+    geom_boxplot() +
+    ggtitle("Sleep Time Distribution") +
+    labs(x = "exam season", y = "sleep time (h)") +
+    scale_y_continuous(breaks=seq(2,12,0.5))
+
+summary(df$course_of_study)
+```
+
+The median seems to sit +/- 30 minutes of 7.5 hours, with the lowest being during exam period and the highest being post-exam period.
+
+```{r}
+df %>% subset(!is.na(PSQI_SUB_Sleep_Efficiency)) %>%
+    ggplot(aes(x=PSQI_SUB_Sleep_Efficiency)) +
+    geom_bar(stat="count", aes(fill=factor(PSQI_SUB_Sleep_Efficiency))) +
+    ggtitle("Sleep Efficiency Distribution") +
+    facet_grid(. ~ time) +
+    labs(x = "sleep efficiency", y = "count") +
+    theme(legend.position="none")
+```
+
+Sleep efficiency slightly dips during exam period.
+
+
+
 ```{r}
 df %>%
     ggplot(aes(x=PSQ_total, y=Sleep_Efficiency, color = time)) +
@@ -94,18 +161,18 @@ df %>%
     labs(x = "perceived stress (PSQ-20)", y = "sleep efficiency") +
     facet_grid(~time)
 ```
-#### Legal drugs and sleep latency
+
+### Legal drugs and sleep quality
+
 ```{r}
 df %>% ggplot(aes(x= caffeine_per_day, y=PSQI_ITEM2_Sleep_Latency)) +
     geom_point() +
     geom_smooth() +
     scale_y_continuous(limit = c(0,100), breaks=seq(0, 100, 10)) +
     scale_x_continuous(limit = c(0, 5), breaks = seq(0, 5, 0.5))
-    
 ```
 
 There doesn't seem to be any correlation between caffeine consumption and sleep latency.
-
 
 ```{r}
 df %>% subset(!is.na(caffeine_per_day)) %>%
@@ -117,8 +184,6 @@ df %>% subset(!is.na(caffeine_per_day)) %>%
     labs(x = "caffeine per day (caffeine units)", y = "PSQI score") +
     facet_grid(~time)
 ```
-
-
 
 
 
