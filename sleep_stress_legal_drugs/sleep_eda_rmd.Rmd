@@ -1,0 +1,148 @@
+---
+title: "EDA on Sleep, Legal Drugs, and Exam Stress"
+author: "Joanne Jang"
+date: "5/23/2017"
+output: html_document
+---
+data from: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109490#pone.0109490-Zunhammer1
+
+```{r, message = FALSE}
+# Libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# Dataset
+df <- read_delim("/Users/jjang/sleep_eda/Exam_Stress_Zunhammer_et_al_2013.csv", delim=";", col_types = cols(PSQI_ITEM1_Bedtime = col_character(), PSQI_ITEM3_Waketime = col_character(), PSQI_Time_in_Bed = col_number()))
+
+# filtering dropouts
+df <- df %>% filter(filter_dropouts == 1)
+summary(df$time)
+df$time <- ordered(df$time, level = c(1, 2, 3), labels=c("pre-exam", "during", "post-exam"))
+df$PSQI_SUB_Sleep_Efficiency <- ordered(df$PSQI_SUB_Sleep_Efficiency, levels=c(0, 1, 2, 3), labels=c("> 85%", "75-84%", "65-74%", "< 65%"))
+df$sex <- factor(df$sex, levels=c(0,1), labels=c("female", "male"))
+
+```
+#### Perceived stress
+```{r}
+
+df %>% ggplot(aes(x=factor(time), y=PSQ_total)) +
+    geom_boxplot() +
+    ggtitle("Perceived Stress") +
+    labs(x = "exam season", y = "perceived stress score (PSQ-20)")
+```
+
+#### Perceived sleep quality index
+```{r}
+
+df %>% ggplot(aes(x=factor(time), y=PSQI_total)) +
+    geom_boxplot() +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Perceived Sleep Quality Index") +
+    labs(x = "exam season", y = "PSQI score")
+```
+
+
+#### Sleep time and efficiency comparison
+```{r}
+df %>% ggplot(aes(x=factor(time), y=PSQI_ITEM4_Sleep_Time)) +
+    geom_boxplot() +
+    ggtitle("Sleep Time Distribution") +
+    labs(x = "exam season", y = "sleep time (h)") +
+    scale_y_continuous(breaks=seq(2,12,0.5))
+
+summary(df$course_of_study)
+```
+
+Sleep efficiency:
+
+# hours slept / # hours spent in bed * 100
+
+>85%: 0
+75-84%: 1
+65-74%: 2
+< 65: 3
+
+The lower the score, the more efficient.
+
+```{r}
+df %>% subset(!is.na(PSQI_SUB_Sleep_Efficiency)) %>%
+    ggplot(aes(x=PSQI_SUB_Sleep_Efficiency)) +
+    geom_bar(stat="count", aes(fill=factor(PSQI_SUB_Sleep_Efficiency))) +
+    ggtitle("Sleep Efficiency Distribution") +
+    facet_grid(. ~ time) +
+    labs(x = "sleep efficiency", y = "count") +
+    theme(legend.position="none")
+```
+```{r}
+df %>%
+    ggplot(aes(x=PSQ_total, y=PSQI_total, color = time)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x) +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Perceived Stress and Sleep Quality") +
+    labs(x = "perceived stress (PSQ-20)", y = "PSQI score") +
+    facet_grid(~time)
+```
+
+```{r}
+df %>%
+    ggplot(aes(x=PSQ_total, y=Sleep_Efficiency, color = time)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x) +
+    ggtitle("Perceived Stress and Sleep Efficiency") +
+    labs(x = "perceived stress (PSQ-20)", y = "sleep efficiency") +
+    facet_grid(~time)
+```
+#### Legal drugs and sleep latency
+```{r}
+df %>% ggplot(aes(x= caffeine_per_day, y=PSQI_ITEM2_Sleep_Latency)) +
+    geom_point() +
+    geom_smooth() +
+    scale_y_continuous(limit = c(0,100), breaks=seq(0, 100, 10)) +
+    scale_x_continuous(limit = c(0, 5), breaks = seq(0, 5, 0.5))
+    
+```
+
+There doesn't seem to be any correlation between caffeine consumption and sleep latency.
+
+
+```{r}
+df %>% subset(!is.na(caffeine_per_day)) %>%
+    ggplot(aes(x=caffeine_per_day, y=PSQI_total, color = time)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x) +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Caffeine Consumption") +
+    labs(x = "caffeine per day (caffeine units)", y = "PSQI score") +
+    facet_grid(~time)
+```
+
+
+
+
+
+```{r}
+df %>% subset(!is.na(nicotione_per_day)) %>%
+    ggplot(aes(x=nicotione_per_day, y=PSQI_total, color = sex)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x) +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Nicotine Consumption") +
+    labs(x = "nicotine per day (cigarettes)", y = "PSQI score") +
+    facet_grid(~time)
+
+```
+
+ "Increased cigarette consumption was associated with decreased sleep quality."
+
+```{r}
+df %>% subset(!is.na(alcohol_drinks_per_week)) %>%
+    ggplot(aes(x=alcohol_drinks_per_week, y=PSQI_total, color = sex)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x) +
+    geom_hline(yintercept=5, color="red") +
+    ggtitle("Alcohol Consumption") +
+    labs(x = "alcohol drinks per week (standard drinks)", y = "PSQI score") +
+    facet_grid(~time)
+```
