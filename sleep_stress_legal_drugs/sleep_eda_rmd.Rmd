@@ -4,9 +4,9 @@ author: "Joanne Jang"
 date: "5/23/2017"
 output: html_document
 ---
-## About the dataset
-426 observations of 115 variables.
-data from: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109490#pone.0109490-Zunhammer1
+## Introduction
+
+I found a [dataset](https://doi.org/10.1371/journal.pone.0109490) called "Sleep Quality during Exam Stress: The Role of Alcohol, Caffeine and Nicotine," gathered as part of a sleep study in Germany. There are 426 observations of 115 variables, but I plan on focusing on the effects of stress, exams, and legal drugs on the length, quality, and efficiency of sleep.
 
 ## Data cleaning
 ```{r, message = FALSE}
@@ -25,7 +25,7 @@ df$PSQI_SUB_Sleep_Efficiency <- ordered(df$PSQI_SUB_Sleep_Efficiency, levels=c(0
 df$sex <- factor(df$sex, levels=c(0,1), labels=c("female", "male"))
 ```
 
-## Initial question
+### Initial question
 Do exams actually increase the perceived stress level? If so, how does the
 stress affect various aspects of sleep (e.g. sleep quality, sleep efficiency,
 sleep latency)?
@@ -77,6 +77,7 @@ This figure clearly indicates that perceived stress and insomnia are directly co
 
 #### Does perceived stress have an effect on sleep quality as well?
 [National Sleep Foundation](https://sleepfoundation.org/press-release/what-good-quality-sleep) defines good sleep quality as the following:
+
 * high **sleep efficiency**: the time spent actually sleeping while in bed must be at least 85% of the total time spent in bed, calculated as (# hours slept / # hours spent in bed * 100)%
 * low **sleep latency**: falling asleep in 30 minutes or less
 * minimal arousal: waking up no more than once per night
@@ -150,9 +151,7 @@ df %>% subset(!is.na(PSQI_SUB_Sleep_Efficiency)) %>%
 
 Sleep efficiency slightly dips during exam period.
 
-
-
-```{r}
+```{r, warning=FALSE}
 df %>%
     ggplot(aes(x=PSQ_total, y=Sleep_Efficiency, color = time)) +
     geom_point() +
@@ -162,19 +161,33 @@ df %>%
     facet_grid(~time)
 ```
 
-### Legal drugs and sleep quality
+Sleep efficiency seems to decrease as perceived stress increases, but sleep efficiency is least affected after exam period.
 
-```{r}
+## Legal drugs and sleep quality
+
+One strong predictor of sleep quality and latency we haven't acknowledged yet is the consumption of "legal drugs": caffeine, nicotine, and alcohol.
+
+#### Caffeine and Sleep Latency
+
+Caffeine has the effect of appearing as adenosine to nerve cells and binding to the adenosine receptors to keep the brain from detecting adenosine and slowing down the nerve activity. My prediction is that caffeine will have a negative impact on sleep latency.
+
+```{r, warning=FALSE}
 df %>% ggplot(aes(x= caffeine_per_day, y=PSQI_ITEM2_Sleep_Latency)) +
     geom_point() +
     geom_smooth() +
     scale_y_continuous(limit = c(0,100), breaks=seq(0, 100, 10)) +
-    scale_x_continuous(limit = c(0, 5), breaks = seq(0, 5, 0.5))
+    scale_x_continuous(limit = c(0, 5), breaks = seq(0, 5, 0.5)) +
+    ggtitle("Caffeine and Sleep Latency") +
+    labs(x = "caffeine per day (caffeine units)", y = "Sleep Latency (minutes it took to fall asleep)")
 ```
 
 There doesn't seem to be any correlation between caffeine consumption and sleep latency.
 
-```{r}
+#### Sleep quality and caffeine/nicotine/alcohol
+
+In this dataset, an alcoholic drink is measured in standard drinks (333 mL of beer), a unit of caffeine is measured as 200 mL of coffee or tea, and nicotine is measured in number of cigarettes.
+
+```{r, warning=FALSE}
 df %>% subset(!is.na(caffeine_per_day)) %>%
     ggplot(aes(x=caffeine_per_day, y=PSQI_total, color = time)) +
     geom_point() +
@@ -185,9 +198,7 @@ df %>% subset(!is.na(caffeine_per_day)) %>%
     facet_grid(~time)
 ```
 
-
-
-```{r}
+```{r, warning=FALSE}
 df %>% subset(!is.na(nicotione_per_day)) %>%
     ggplot(aes(x=nicotione_per_day, y=PSQI_total, color = sex)) +
     geom_point() +
@@ -199,9 +210,9 @@ df %>% subset(!is.na(nicotione_per_day)) %>%
 
 ```
 
- "Increased cigarette consumption was associated with decreased sleep quality."
+Purely based on the line of best fit, it looks like nicotine has a positive effect on sleep quality for females during and after the exam period, but it's important to note that there aren't many femal smokers to start with, so the trend line doesn't say much. However, we can see that nicotine consumption does have a slightly negative impact on sleep quality.
 
-```{r}
+```{r, warning=FALSE}
 df %>% subset(!is.na(alcohol_drinks_per_week)) %>%
     ggplot(aes(x=alcohol_drinks_per_week, y=PSQI_total, color = sex)) +
     geom_point() +
@@ -211,3 +222,7 @@ df %>% subset(!is.na(alcohol_drinks_per_week)) %>%
     labs(x = "alcohol drinks per week (standard drinks)", y = "PSQI score") +
     facet_grid(~time)
 ```
+
+## Conclusion
+
+Perceived stress level dominates as a predictor of many aspects of sleep (including quality, efficiency, and insomnia), and whether or not a student has a set of exams coming up is a strong predictor of the perceived stress level. Therefore we can conclude that exams have a nontrivial amount of influence on students' mental health and sleep hygiene.
